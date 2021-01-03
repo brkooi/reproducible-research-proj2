@@ -1,0 +1,81 @@
+---
+title: "Analysis storm-effects USA"
+author: "Ben Kooi"
+date: "3-1-2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Synopsis
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+## Data processing
+``` {r , cache=TRUE}
+#load packages
+packages <- c("data.table","dplyr", "ggplot2")
+sapply(packages, require, character.only=TRUE, quietly=TRUE)
+
+# download file and unzip datafiles
+path_files <- getwd()
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(url, "StormData.csv.bz2")
+stormdata_raw <- read.csv("StormData.csv.bz2")
+str(stormdata_raw)
+```
+
+``` {r , cache=TRUE}
+stormdata_processed <- stormdata_raw %>%
+                        select(REFNUM,
+                               BGN_DATE,
+                               BGN_TIME,
+                               EVTYPE,
+                               STATE,
+                               COUNTYNAME,
+                               FATALITIES,
+                               INJURIES,
+                               PROPDMG,
+                               PROPDMGEXP) %>%
+                        mutate(BGN_DATE=as.Date(BGN_DATE,"%m/%d/%Y"),
+                               EVTYPE=as.factor(EVTYPE),
+                               PROPDMG=PROPDMG*ifelse(PROPDMGEXP=='K',1000,
+                                                      ifelse(PROPDMGEXP=='M',1000000,
+                                                             ifelse(PROPDMGEXP=='B',1000000000,PROPDMG))),
+                               PROPDMGEXP=NULL,
+                               YEAR=year(BGN_DATE)
+                                                     
+                               )
+
+str(stormdata_processed)
+summary(stormdata_processed)
+head(stormdata_processed)
+```
+
+```{r , cache=TRUE}
+stormdata_result <- stormdata_processed %>%
+                    select(YEAR,
+                           EVTYPE,
+                           FATALITIES,
+                           INJURIES,
+                           PROPDMG) %>%
+                    group_by(YEAR,
+                             EVTYPE) %>%
+                    summarize(FATALITIES=sum(FATALITIES),
+                              INJURIES=sum(INJURIES),
+                              PROPDMG=sum(PROPDMG))
+str(stormdata_result)
+head(stormdata_result)
+summary(stormdata_result)
+```
+
+You can also embed plots, for example:
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+## Results
