@@ -1,5 +1,5 @@
 ---
-title: "Analysis storm-effects USA"
+title: "Analysis effects Extreme Weather USA"
 author: "Ben Kooi"
 date: "3-1-2021"
 output: html_document
@@ -11,17 +11,37 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Synopsis
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+This analysis of the effects of extreme weather, gives answers to the these two questions:
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+1. Across the United States, which types of events are most harmful with respect to population health?
+
+2. Across the United States, which types of events have the greatest economic consequences?
+
+The source of the used dataset is the National Weather Service and can be downloaded [here](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2).
+
+This analysis shows that the most harmful weathertype are tornado's. Tornado's have the most fatalities and the most injuries of all weathertypes.
+The weathertype with the most economic damage are floods.
+
 
 ## Data processing
+This section describes the steps that are taken for processing the raw data. These steps are:
+
+1. Load the packages we need for this analysis;
+2. download the raw data from the National Weather Service;
+3. read the dataset into a datframe called 'stormdata_raw';
+4. examine the structure of the raw dataset;
+5. create a new dataset 'stormdata_processed' which will be the analysis-dataset;
+6. examine the structure, summary and brief
+
+### load the needed packages
 ``` {r , cache=TRUE}
 #load packages
-packages <- c("data.table","dplyr", "ggplot2")
+packages <- c("data.table","dplyr", "ggplot2", "knitr")
 sapply(packages, require, character.only=TRUE, quietly=TRUE)
+```
 
-# download file and unzip datafiles
+### download file and unzip datafiles
+``` {r , cache=TRUE}
 path_files <- getwd()
 url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 download.file(url, "StormData.csv.bz2")
@@ -29,48 +49,54 @@ stormdata_raw <- read.csv("StormData.csv.bz2")
 str(stormdata_raw)
 ```
 
+### create the analysis-dataset
+For answering the two main questions, we only need the variables:
+
+* EVTYPE       = type of weather-event;
+* FATALITIES   = amount of persons who died at a particular extreme weather-event;
+* INJURIES     = amount of persons who were injured at a particular extreme weather-event;
+* PROPDMG      = amount of economic property damage (dollars) at a particular extreme weather-event;
+* PROPDMGEXP   = the exponent value of the economic property damage.
+
+For creating the right dataset we have to mutate EVTYPE to a factor-value and calculate the property damage by it's exponent. The exponent is deleted.
+
 ``` {r , cache=TRUE}
 stormdata_processed <- stormdata_raw %>%
-                        select(REFNUM,
-                               BGN_DATE,
-                               BGN_TIME,
-                               EVTYPE,
-                               STATE,
-                               COUNTYNAME,
+                        select(EVTYPE,
                                FATALITIES,
                                INJURIES,
                                PROPDMG,
                                PROPDMGEXP) %>%
-                        mutate(BGN_DATE=as.Date(BGN_DATE,"%m/%d/%Y"),
-                               EVTYPE=as.factor(EVTYPE),
+                        mutate(EVTYPE=as.factor(EVTYPE),
                                PROPDMG=PROPDMG*ifelse(PROPDMGEXP=='K',1000,
                                                       ifelse(PROPDMGEXP=='M',1000000,
                                                              ifelse(PROPDMGEXP=='B',1000000000,PROPDMG))),
                                PROPDMGEXP=NULL,
-                               YEAR=year(BGN_DATE)
-                                                     
                                )
+```
 
+### examine the analysis-dataset and detremine if the dataset is right
+``` {r , cache=TRUE}
 str(stormdata_processed)
 summary(stormdata_processed)
 head(stormdata_processed)
 ```
 
 ```{r , cache=TRUE}
-stormdata_result <- stormdata_processed %>%
-                    select(YEAR,
-                           EVTYPE,
+stormdata_results <- stormdata_processed %>%
+                    select(EVTYPE,
                            FATALITIES,
                            INJURIES,
                            PROPDMG) %>%
-                    group_by(YEAR,
-                             EVTYPE) %>%
+                    group_by(EVTYPE) %>%
                     summarize(FATALITIES=sum(FATALITIES),
                               INJURIES=sum(INJURIES),
                               PROPDMG=sum(PROPDMG))
-str(stormdata_result)
-head(stormdata_result)
-summary(stormdata_result)
+
+stormdata_harmful<- stormdata_results %>% arrange(desc(FATALITIES),desc(INJURIES),desc(PROPDMG))
+stormdata_damage<- stormdata_results %>% arrange(desc(PROPDMG),desc(FATALITIES),desc(INJURIES))
+kable(head(stormdata_harmful), caption="Top 6 most harmfull nature events")
+kable(head(stormdata_damage),caption="Top 6 most economic damaging nature events")
 ```
 
 You can also embed plots, for example:
@@ -79,3 +105,23 @@ Note that the `echo = FALSE` parameter was added to the code chunk to prevent pr
 
 
 ## Results
+
+```{r ,cache=TRUE}
+ggplot(head(stormdata_harmful), aes(reorder(x=EVTYPE,-FATALITIES), y=FATALITIES)) + 
+  geom_bar(stat = "identity",fill="red", colour="red4") +
+  labs(title = "Fatalities by Nature Events", subtitle="from 1950 until 2011", x="Type of Nature Events", y="Total Fatalities")
+```
+
+
+```{r ,cache=TRUE}
+ggplot(head(stormdata_harmful), aes(reorder(x=EVTYPE,-INJURIES), y=INJURIES)) + 
+  geom_bar(stat = "identity",fill="steelblue1", colour="steelblue4") +
+  labs(title = "Injuries by Nature Events", subtitle="from 1950 until 2011", x="Type of Nature Events", y="Total injuries")
+```
+
+```{r damage,cache=TRUE}
+ggplot(head(stormdata_damage), aes(reorder(x=EVTYPE,-PROPDMG), y=PROPDMG)) + 
+  geom_bar(stat = "identity",fill="hotpink", colour="hotpink4") +
+  labs(title = "Economic damage by Nature Events", subtitle="from 1950 until 2011", x="Type of Nature Events", y="Total damage (dollars)")
+```
+
